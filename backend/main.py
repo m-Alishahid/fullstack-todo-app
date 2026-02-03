@@ -39,14 +39,14 @@ async def lifespan(app: FastAPI):
     """
     # Startup: Create database tables
     print("Starting up: Creating database tables...")
-    await create_db_and_tables()
+    create_db_and_tables()
     print("Database tables created successfully")
 
     yield
 
     # Shutdown: Close database connections
     print("Shutting down: Closing database connections...")
-    await close_db()
+    close_db()
     print("Database connections closed")
 
 

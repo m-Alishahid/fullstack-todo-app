@@ -7,7 +7,7 @@ Endpoints:
 - GET /api/auth/me - Get current user info
 """
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from app.dependencies import get_db, get_current_user
@@ -29,9 +29,9 @@ router = APIRouter(tags=["auth"])
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(
+def register(
     user_data: UserCreateRequest,
-    session: AsyncSession = Depends(get_db),
+    session: Session = Depends(get_db),
 ):
     """
     Register a new user.
@@ -47,7 +47,7 @@ async def register(
         HTTPException 400: If email already exists
     """
     # Check if email already exists
-    result = await session.execute(
+    result = session.execute(
         select(User).where(User.email == user_data.email)
     )
     existing_user = result.scalar_one_or_none()
@@ -69,8 +69,8 @@ async def register(
     )
     
     session.add(new_user)
-    await session.commit()
-    await session.refresh(new_user)
+    session.commit()
+    session.refresh(new_user)
     
     # Create access token
     access_token = create_access_token(data={"sub": new_user.id})
@@ -82,9 +82,9 @@ async def register(
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(
+def login(
     credentials: UserLoginRequest,
-    session: AsyncSession = Depends(get_db),
+    session: Session = Depends(get_db),
 ):
     """
     Login and get JWT token.
@@ -100,7 +100,7 @@ async def login(
         HTTPException 401: If credentials are invalid
     """
     # Find user by email
-    result = await session.execute(
+    result = session.execute(
         select(User).where(User.email == credentials.email)
     )
     user = result.scalar_one_or_none()
@@ -122,7 +122,7 @@ async def login(
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_me(
+def get_me(
     current_user: User = Depends(get_current_user),
 ):
     """

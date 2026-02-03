@@ -1,8 +1,13 @@
-// frontend/components/AuthForm.tsx
 'use client';
 
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-hot-toast';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { AuthResponse } from '@/lib/types';
 
 type AuthMode = 'signin' | 'signup';
@@ -114,10 +119,14 @@ export default function AuthForm() {
       localStorage.setItem('auth_token', authData.access_token);
       localStorage.setItem('user', JSON.stringify(authData.user));
 
+      toast.success(mode === 'signin' ? 'Welcome back!' : 'Account created successfully!');
+
       // Redirect to dashboard
       router.push('/dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred';
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -134,254 +143,126 @@ export default function AuthForm() {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto p-8 glass rounded-2xl shadow-2xl border border-white/20 animate-scaleIn">
-      {/* Mode Toggle Pills */}
-      <div className="flex gap-2 mb-8 p-1 bg-gray-100 rounded-xl">
-        <button
-          type="button"
-          onClick={() => mode === 'signup' && toggleMode()}
-          className={`flex-1 py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-300 ${
-            mode === 'signin'
-              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Sign In
-        </button>
-        <button
-          type="button"
-          onClick={() => mode === 'signin' && toggleMode()}
-          className={`flex-1 py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-300 ${
-            mode === 'signup'
-              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Sign Up
-        </button>
-      </div>
+    <Card className="w-full max-w-md mx-auto border-border/40 shadow-xl backdrop-blur-sm bg-card/95">
+      <CardHeader className="space-y-1 text-center">
+        <CardTitle className="text-2xl font-bold tracking-tight">
+          {mode === 'signin' ? 'Welcome back' : 'Create an account'}
+        </CardTitle>
+        <CardDescription>
+          {mode === 'signin'
+            ? 'Enter your credentials to access your account'
+            : 'Enter your details to get started'}
+        </CardDescription>
+      </CardHeader>
 
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-        {/* Email Field */}
-        <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-semibold text-gray-700 mb-2"
-          >
-            Email Address
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <AnimatePresence mode="wait">
+            {mode === 'signup' && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="space-y-2 overflow-hidden"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"
-                />
-              </svg>
-            </div>
-            <input
-              type="email"
+                <div className="space-y-1">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    placeholder="John Doe"
+                    value={formData.name}
+                    onChange={handleChange}
+                    disabled={loading}
+                    className={validationErrors.name ? "border-destructive focus-visible:ring-destructive" : ""}
+                  />
+                  {validationErrors.name && (
+                    <p className="text-xs text-destructive font-medium">{validationErrors.name}</p>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="space-y-1">
+            <Label htmlFor="email">Email</Label>
+            <Input
               id="email"
               name="email"
+              type="email"
+              placeholder="name@example.com"
               value={formData.email}
               onChange={handleChange}
-              required
-              aria-required="true"
-              aria-invalid={!!validationErrors.email}
-              aria-describedby={validationErrors.email ? 'email-error' : undefined}
-              className={`w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all duration-200 ${
-                validationErrors.email ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-white hover:border-gray-400'
-              }`}
-              placeholder="you@example.com"
               disabled={loading}
+              className={validationErrors.email ? "border-destructive focus-visible:ring-destructive" : ""}
             />
-          </div>
-          {validationErrors.email && (
-            <p id="email-error" className="mt-2 text-sm text-red-600 flex items-center gap-1" role="alert">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              {validationErrors.email}
-            </p>
-          )}
-        </div>
-
-        {/* Name Field (Sign Up Only) */}
-        {mode === 'signup' && (
-          <div className="animate-slideDown">
-            <label
-              htmlFor="name"
-              className="block text-sm font-semibold text-gray-700 mb-2"
-            >
-              Full Name
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                  />
-                </svg>
-              </div>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                aria-required="true"
-                aria-invalid={!!validationErrors.name}
-                aria-describedby={validationErrors.name ? 'name-error' : undefined}
-                className={`w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all duration-200 ${
-                  validationErrors.name ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-white hover:border-gray-400'
-                }`}
-                placeholder="John Doe"
-                disabled={loading}
-              />
-            </div>
-            {validationErrors.name && (
-              <p id="name-error" className="mt-2 text-sm text-red-600 flex items-center gap-1" role="alert">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                {validationErrors.name}
-              </p>
+            {validationErrors.email && (
+              <p className="text-xs text-destructive font-medium">{validationErrors.email}</p>
             )}
           </div>
-        )}
 
-        {/* Password Field */}
-        <div>
-          <label
-            htmlFor="password"
-            className="block text-sm font-semibold text-gray-700 mb-2"
-          >
-            Password
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                />
-              </svg>
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              {mode === 'signin' && (
+                <a href="#" className="text-xs text-primary hover:underline font-medium">
+                  Forgot password?
+                </a>
+              )}
             </div>
-            <input
-              type="password"
+            <Input
               id="password"
               name="password"
+              type="password"
+              placeholder="••••••••"
               value={formData.password}
               onChange={handleChange}
-              required
-              aria-required="true"
-              aria-invalid={!!validationErrors.password}
-              aria-describedby={validationErrors.password ? 'password-error' : undefined}
-              minLength={8}
-              className={`w-full pl-12 pr-4 py-3 border rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all duration-200 ${
-                validationErrors.password ? 'border-red-500 bg-red-50' : 'border-gray-300 bg-white hover:border-gray-400'
-              }`}
-              placeholder="••••••••"
               disabled={loading}
+              className={validationErrors.password ? "border-destructive focus-visible:ring-destructive" : ""}
             />
+            {validationErrors.password && (
+              <p className="text-xs text-destructive font-medium">{validationErrors.password}</p>
+            )}
           </div>
-          {validationErrors.password && (
-            <p id="password-error" className="mt-2 text-sm text-red-600 flex items-center gap-1" role="alert">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              {validationErrors.password}
-            </p>
-          )}
-        </div>
 
-        {/* Error Message */}
-        {error && (
-          <div
-            className="p-4 bg-red-50 border border-red-200 rounded-xl animate-slideDown"
-            role="alert"
-            aria-live="polite"
-          >
-            <div className="flex items-start gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              <p className="text-sm text-red-700 font-medium">{error}</p>
+          {error && (
+            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive font-medium flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-alert-circle"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
+              {error}
             </div>
-          </div>
-        )}
-
-        {/* Submit Button */}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-3.5 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
-          aria-busy={loading}
-        >
-          {loading ? (
-            <span className="flex items-center justify-center">
-              <svg
-                className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                ></circle>
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              {mode === 'signin' ? 'Signing In...' : 'Signing Up...'}
-            </span>
-          ) : (
-            <span className="flex items-center justify-center gap-2">
-              {mode === 'signin' ? 'Sign In' : 'Create Account'}
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-            </span>
           )}
-        </button>
-      </form>
-    </div>
+
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={loading}
+            size="lg"
+          >
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                <span>Please wait...</span>
+              </div>
+            ) : (
+              mode === 'signin' ? 'Sign In' : 'Create Account'
+            )}
+          </Button>
+        </form>
+      </CardContent>
+
+      <CardFooter>
+        <div className="text-sm text-center text-muted-foreground w-full">
+          {mode === 'signin' ? "Don't have an account? " : "Already have an account? "}
+          <button
+            type="button"
+            onClick={toggleMode}
+            className="font-semibold text-primary hover:underline transition-colors"
+            disabled={loading}
+          >
+            {mode === 'signin' ? 'Sign up' : 'Log in'}
+          </button>
+        </div>
+      </CardFooter>
+    </Card>
   );
 }

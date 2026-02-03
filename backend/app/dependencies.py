@@ -17,11 +17,11 @@ Usage in routes:
         ...
 """
 
-from typing import AsyncGenerator
+from typing import Generator
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from app.database import get_session
@@ -41,7 +41,7 @@ security = HTTPBearer()
 # Database Dependencies
 # ========================================
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
+async def get_db() -> Generator[Session, None, None]:
     """
     Dependency function to provide database sessions to route handlers.
 
@@ -50,19 +50,19 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
     Usage:
         @router.get("/items")
-        async def get_items(db: AsyncSession = Depends(get_db)):
-            result = await db.execute(select(Item))
+        def get_items(db: Session = Depends(get_db)):
+            result = db.execute(select(Item))
             return result.scalars().all()
 
     Yields:
-        AsyncSession: Database session with automatic commit/rollback handling
+        Session: Database session with automatic commit/rollback handling
 
     Notes:
         - Session is automatically committed on success
         - Session is automatically rolled back on exception
         - Session is always closed after the request
     """
-    async for session in get_session():
+    for session in get_session():
         yield session
 
 
@@ -70,9 +70,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 # Authentication Dependencies
 # ========================================
 
-async def get_current_user(
+def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ) -> User:
     """
     Dependency to get the current authenticated user from JWT token.
@@ -86,7 +86,7 @@ async def get_current_user(
 
     Usage:
         @router.get("/profile")
-        async def get_profile(user: User = Depends(get_current_user)):
+        def get_profile(user: User = Depends(get_current_user)):
             return {"user_id": user.id, "email": user.email}
 
     Args:
@@ -136,16 +136,17 @@ async def get_current_user(
 
     # Query database for the user
     try:
-        result = await db.execute(
+        result = db.execute(
             select(User).where(User.id == user_id)
         )
         user = result.scalar_one_or_none()
 
     except Exception as e:
         # Database error
+        print(f"Detailed Auth DB Error: {e}")  # DEBUG LOG
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error while fetching user"
+            detail=f"Database error while fetching user: {str(e)}"
         )
 
     # User not found in database

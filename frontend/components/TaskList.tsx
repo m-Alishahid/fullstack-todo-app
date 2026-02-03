@@ -1,17 +1,19 @@
-/**
- * TaskList Component
- *
- * Displays a filterable, sortable list of tasks with empty and loading states.
- * Supports filtering by completion status and sorting by creation date.
- */
-
 'use client';
 
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Task } from '@/lib/types';
 import TaskItem from './TaskItem';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { CATEGORIES, CATEGORY_COLORS, PRIORITIES, PRIORITY_COLORS } from '@/lib/constants';
+import { cn } from '@/lib/utils';
+import {
+  FunnelIcon,
+  XMarkIcon,
+  InboxIcon,
+  ClipboardDocumentCheckIcon
+} from '@heroicons/react/24/outline';
 
 interface TaskListProps {
   tasks: Task[];
@@ -38,458 +40,210 @@ export default function TaskList({
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [priorityFilter, setPriorityFilter] = useState<string | null>(null);
 
-  /**
-   * Filter and sort tasks based on current filter selection and search query
-   */
   const filteredTasks = useMemo(() => {
-    let filtered = tasks;
+    let result = tasks;
 
-    // Apply search filter
-    if (searchQuery && searchQuery.trim()) {
+    // Search
+    if (searchQuery?.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter((task) => {
-        const titleMatch = task.title.toLowerCase().includes(query);
-        const descMatch = task.description?.toLowerCase().includes(query);
-        return titleMatch || descMatch;
-      });
+      result = result.filter(t =>
+        t.title.toLowerCase().includes(query) ||
+        t.description?.toLowerCase().includes(query)
+      );
     }
 
-    // Apply category filter
+    // Category
     if (categoryFilter) {
-      filtered = filtered.filter((task) => task.category === categoryFilter);
+      result = result.filter(t => t.category === categoryFilter);
     }
 
-    // Apply priority filter
+    // Priority
     if (priorityFilter) {
-      filtered = filtered.filter((task) => task.priority === priorityFilter);
+      result = result.filter(t => t.priority === priorityFilter);
     }
 
-    // Apply filter
-    switch (filter) {
-      case 'active':
-        filtered = tasks.filter((task) => !task.completed);
-        break;
-      case 'completed':
-        filtered = tasks.filter((task) => task.completed);
-        break;
-      case 'all':
-      default:
-        filtered = tasks;
-        break;
-    }
+    // Status
+    if (filter === 'active') result = result.filter(t => !t.completed);
+    if (filter === 'completed') result = result.filter(t => t.completed);
 
-    // Sort: overdue tasks first, then by priority, then by due date, then by creation date
-    return filtered.sort((a, b) => {
+    // Sort
+    return result.sort((a, b) => {
+      // Overdue first
       const now = new Date();
-
-      // Check if tasks are overdue (only for incomplete tasks)
-      const aOverdue = !a.completed && a.due_date && new Date(a.due_date) < now;
+      const aOverdie = !a.completed && a.due_date && new Date(a.due_date) < now;
       const bOverdue = !b.completed && b.due_date && new Date(b.due_date) < now;
+      if (aOverdie && !bOverdue) return -1;
+      if (!aOverdie && bOverdue) return 1;
 
-      if (aOverdue && !bOverdue) return -1;
-      if (!aOverdue && bOverdue) return 1;
+      // Priority
+      const pOrder = { high: 0, medium: 1, low: 2 };
+      const aP = pOrder[a.priority as keyof typeof pOrder] ?? 1;
+      const bP = pOrder[b.priority as keyof typeof pOrder] ?? 1;
+      if (aP !== bP) return aP - bP;
 
-      // Priority order: high (0) > medium (1) > low (2)
-      const priorityOrder = { high: 0, medium: 1, low: 2 };
-      const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 1;
-      const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 1;
-
-      if (aPriority !== bPriority) {
-        return aPriority - bPriority;
-      }
-
-      // If same priority, sort by due date (earliest first)
+      // Due date
       if (a.due_date && b.due_date) {
         return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
       }
       if (a.due_date) return -1;
       if (b.due_date) return 1;
 
-      // If no due dates, sort by newest first
+      // Created At (newest first)
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
   }, [tasks, filter, searchQuery, categoryFilter, priorityFilter]);
 
-  /**
-   * Get task counts for each filter
-   */
-  const taskCounts = useMemo(() => {
-    return {
-      all: tasks.length,
-      active: tasks.filter((task) => !task.completed).length,
-      completed: tasks.filter((task) => task.completed).length,
-    };
-  }, [tasks]);
-
-  /**
-   * Render filter button
-   */
-  const FilterButton = ({
-    type,
-    label,
-    count,
-  }: {
-    type: FilterType;
-    label: string;
-    count: number;
-  }) => (
-    <button
-      onClick={() => setFilter(type)}
-      className={`
-        px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300
-        focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
-        transform hover:scale-105 active:scale-95
-        ${
-          filter === type
-            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
-            : 'bg-white text-gray-700 hover:bg-gray-50 border-2 border-gray-200 hover:border-indigo-300'
-        }
-      `}
-      aria-label={`Show ${label.toLowerCase()} tasks`}
-      aria-pressed={filter === type}
-    >
-      <span className="flex items-center gap-2">
-        {label}
-        <span
-          className={`
-            px-2.5 py-0.5 rounded-full text-xs font-bold
-            ${
-              filter === type
-                ? 'bg-white/20 text-white'
-                : 'bg-gray-100 text-gray-600'
-            }
-          `}
-        >
-          {count}
-        </span>
-      </span>
-    </button>
-  );
-
-  /**
-   * Loading State
-   */
   if (isLoading) {
     return (
-      <div className="space-y-4" role="status" aria-label="Loading tasks">
-        {/* Filter Skeleton */}
-        <div className="flex flex-wrap gap-3 mb-6">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-11 w-28 bg-gradient-to-r from-gray-200 to-gray-300 rounded-xl animate-pulse"
-            />
+      <div className="space-y-4">
+        {[1, 2, 3].map(i => (
+          <Card key={i} className="h-24 animate-pulse bg-muted/50" />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="p-6 border-destructive/50 bg-destructive/5 text-center">
+        <h3 className="text-lg font-semibold text-destructive">Failed to load tasks</h3>
+        <p className="text-muted-foreground">{error}</p>
+      </Card>
+    );
+  }
+
+  const taskCounts = {
+    all: tasks.length,
+    active: tasks.filter(t => !t.completed).length,
+    completed: tasks.filter(t => t.completed).length,
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Filters Toolbar */}
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-card p-1 rounded-lg border-none sm:border">
+        <div className="flex p-1 bg-muted/50 rounded-lg w-full sm:w-auto">
+          {(['all', 'active', 'completed'] as const).map((type) => (
+            <button
+              key={type}
+              onClick={() => setFilter(type)}
+              className={cn(
+                "flex-1 sm:flex-none px-4 py-1.5 text-sm font-medium rounded-md transition-all",
+                filter === type
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              )}
+            >
+              {type.charAt(0).toUpperCase() + type.slice(1)}
+              <span className="ml-2 text-xs opacity-60">
+                {taskCounts[type]}
+              </span>
+            </button>
           ))}
         </div>
 
-        {/* Task Skeletons */}
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div
-            key={i}
-            className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 animate-pulse"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-6 h-6 bg-gray-200 dark:bg-gray-700 rounded-lg" />
-              <div className="flex-1 space-y-3">
-                <div className="h-6 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded w-3/4" />
-                <div className="h-4 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded w-full" />
-                <div className="h-3 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded w-1/4" />
-              </div>
-              <div className="flex gap-2">
-                <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg" />
-                <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg" />
-              </div>
+        {/* Additional Filters Toggle could go here if we want to hide/show them */}
+      </div>
+
+      {/* Advanced Filters */}
+      {(tasks.some(t => t.category) || tasks.some(t => t.priority)) && (
+        <div className="flex flex-wrap gap-2 items-center text-sm">
+          <span className="text-muted-foreground mr-2 flex items-center gap-1">
+            <FunnelIcon className="w-4 h-4" /> Filter by:
+          </span>
+
+          {tasks.some(t => t.priority) && (
+            <div className="flex flex-wrap gap-1">
+              {PRIORITIES.map(pri => {
+                const isActive = priorityFilter === pri.value;
+                return (
+                  <button
+                    key={pri.value}
+                    onClick={() => setPriorityFilter(isActive ? null : pri.value)}
+                    className={cn(
+                      "px-2 py-1 rounded-full border text-xs flex items-center gap-1 transition-colors",
+                      isActive ? "bg-primary/10 border-primary text-primary" : "border-transparent bg-muted hover:bg-muted/80 text-muted-foreground"
+                    )}
+                  >
+                    {pri.icon} {pri.label}
+                  </button>
+                )
+              })}
             </div>
-          </div>
-        ))}
-        <span className="sr-only">Loading tasks...</span>
-      </div>
-    );
-  }
+          )}
 
-  /**
-   * Error State
-   */
-  if (error) {
-    return (
-      <div
-        className="bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-200 rounded-2xl p-8 text-center animate-slideUp"
-        role="alert"
-      >
-        <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-red-200 rounded-full">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-8 w-8 text-red-600"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-        </div>
-        <h3 className="text-xl font-bold text-red-900 mb-2">
-          Failed to Load Tasks
-        </h3>
-        <p className="text-red-700 font-medium">{error}</p>
-      </div>
-    );
-  }
+          <div className="w-px h-4 bg-border mx-1" />
 
-  /**
-   * Empty State (No Tasks)
-   */
-  if (tasks.length === 0) {
-    return (
-      <div className="text-center py-16 animate-slideUp">
-        <div className="flex items-center justify-center w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-12 w-12 text-indigo-600"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-            />
-          </svg>
-        </div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-3">
-          No Tasks Yet
-        </h3>
-        <p className="text-gray-600 text-lg mb-6 max-w-md mx-auto">
-          Get started by creating your first task using the button above.
-        </p>
-        <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-          </svg>
-          <span>Click &quot;New Task&quot; to add your first todo</span>
-        </div>
-      </div>
-    );
-  }
-
-  /**
-   * Empty Filter State (No Tasks Match Filter)
-   */
-  if (filteredTasks.length === 0) {
-    // Check if it's due to search
-    if (searchQuery && searchQuery.trim()) {
-      return (
-        <div>
-          {/* Filter Buttons */}
-          <div className="flex flex-wrap gap-3 mb-8" role="group" aria-label="Task filters">
-            <FilterButton type="all" label="All" count={taskCounts.all} />
-            <FilterButton type="active" label="Active" count={taskCounts.active} />
-            <FilterButton type="completed" label="Completed" count={taskCounts.completed} />
-          </div>
-
-          {/* No Search Results */}
-          <div className="text-center py-16 animate-slideUp">
-            <div className="flex items-center justify-center w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-full">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+          {tasks.some(t => t.category) && (
+            <div className="flex flex-wrap gap-1">
+              {CATEGORIES.map(cat => {
+                const isActive = categoryFilter === cat.value;
+                return (
+                  <button
+                    key={cat.value}
+                    onClick={() => setCategoryFilter(isActive ? null : cat.value)}
+                    className={cn(
+                      "px-2 py-1 rounded-full border text-xs flex items-center gap-1 transition-colors",
+                      isActive ? "bg-primary/10 border-primary text-primary" : "border-transparent bg-muted hover:bg-muted/80 text-muted-foreground"
+                    )}
+                  >
+                    {cat.icon} {cat.label}
+                  </button>
+                )
+              })}
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-              No tasks found
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 text-lg">
-              No tasks match &quot;{searchQuery}&quot;
-            </p>
-          </div>
-        </div>
-      );
-    }
+          )}
 
-    const emptyMessages = {
-      active: {
-        title: 'No Active Tasks',
-        description: 'All tasks are completed! Great job!',
-        icon: (
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        ),
-        bgColor: 'from-green-100 to-emerald-100',
-      },
-      completed: {
-        title: 'No Completed Tasks',
-        description: 'Complete some tasks to see them here.',
-        icon: (
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        ),
-        bgColor: 'from-blue-100 to-cyan-100',
-      },
-      all: {
-        title: 'No Tasks',
-        description: 'Create a task to get started.',
-        icon: (
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-        ),
-        bgColor: 'from-indigo-100 to-purple-100',
-      },
-    };
-
-    const message = emptyMessages[filter];
-
-    return (
-      <div>
-        {/* Filter Buttons */}
-        <div className="flex flex-wrap gap-3 mb-8" role="group" aria-label="Task filters">
-          <FilterButton type="all" label="All" count={taskCounts.all} />
-          <FilterButton type="active" label="Active" count={taskCounts.active} />
-          <FilterButton type="completed" label="Completed" count={taskCounts.completed} />
-        </div>
-
-        {/* Empty State */}
-        <div className="text-center py-16 animate-slideUp">
-          <div className={`flex items-center justify-center w-24 h-24 mx-auto mb-6 bg-gradient-to-br ${message.bgColor} rounded-full`}>
-            {message.icon}
-          </div>
-          <h3 className="text-2xl font-bold text-gray-900 mb-3">
-            {message.title}
-          </h3>
-          <p className="text-gray-600 text-lg">{message.description}</p>
-        </div>
-      </div>
-    );
-  }
-
-  /**
-   * Main Task List View
-   */
-  return (
-    <div>
-      {/* Filter Buttons */}
-      <div className="flex flex-wrap gap-3 mb-6" role="group" aria-label="Task filters">
-        <FilterButton type="all" label="All" count={taskCounts.all} />
-        <FilterButton type="active" label="Active" count={taskCounts.active} />
-        <FilterButton type="completed" label="Completed" count={taskCounts.completed} />
-      </div>
-
-      {/* Category Filter */}
-      {tasks.some(t => t.category) && (
-        <div className="flex flex-wrap gap-2 mb-6">
-          <button
-            onClick={() => setCategoryFilter(null)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              categoryFilter === null
-                ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-            }`}
-          >
-            All Categories
-          </button>
-          {CATEGORIES.map(cat => {
-            const count = tasks.filter(t => t.category === cat.value).length;
-            if (count === 0) return null;
-
-            return (
-              <button
-                key={cat.value}
-                onClick={() => setCategoryFilter(cat.value)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
-                  categoryFilter === cat.value
-                    ? CATEGORY_COLORS[cat.color]
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                <span>{cat.icon}</span>
-                <span>{cat.label}</span>
-                <span className="text-xs opacity-75">({count})</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Priority Filter */}
-      {tasks.some(t => t.priority) && (
-        <div className="flex flex-wrap gap-2 mb-6">
-          <button
-            onClick={() => setPriorityFilter(null)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              priorityFilter === null
-                ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-            }`}
-          >
-            All Priorities
-          </button>
-          {PRIORITIES.map(pri => {
-            const count = tasks.filter(t => t.priority === pri.value).length;
-            if (count === 0) return null;
-
-            return (
-              <button
-                key={pri.value}
-                onClick={() => setPriorityFilter(pri.value)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
-                  priorityFilter === pri.value
-                    ? PRIORITY_COLORS[pri.color]
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                <span>{pri.icon}</span>
-                <span>{pri.label}</span>
-                <span className="text-xs opacity-75">({count})</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Task Count Summary */}
-      <div className="flex items-center gap-2 text-sm text-gray-600 mb-6 font-medium">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
-          <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-          <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
-        </svg>
-        <span>
-          Showing <span className="font-bold text-gray-900">{filteredTasks.length}</span> {filteredTasks.length === 1 ? 'task' : 'tasks'}
-        </span>
-      </div>
-
-      {/* Task List */}
-      <div
-        className="space-y-4"
-        role="list"
-        aria-label={`${filter === 'all' ? 'All' : filter === 'active' ? 'Active' : 'Completed'} tasks`}
-      >
-        <AnimatePresence mode="popLayout">
-          {filteredTasks.map((task) => (
-            <motion.div
-              key={task.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: -100 }}
-              transition={{ duration: 0.3 }}
-              layout
+          {(categoryFilter || priorityFilter) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setCategoryFilter(null); setPriorityFilter(null); }}
+              className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
             >
+              <XMarkIcon className="w-3 h-3 mr-1" /> Clear
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* List */}
+      <div className="space-y-4 min-h-[300px]">
+        <AnimatePresence mode="popLayout">
+          {filteredTasks.length > 0 ? (
+            filteredTasks.map(task => (
               <TaskItem
+                key={task.id}
                 task={task}
                 onToggle={onTaskUpdate}
                 onDelete={onTaskDelete}
                 onEdit={onTaskEdit}
               />
+            ))
+          ) : (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center justify-center py-16 text-center"
+            >
+              <div className="p-4 rounded-full bg-muted/50 mb-4">
+                {filter === 'completed' ? (
+                  <ClipboardDocumentCheckIcon className="w-12 h-12 text-muted-foreground/50" />
+                ) : (
+                  <InboxIcon className="w-12 h-12 text-muted-foreground/50" />
+                )}
+              </div>
+              <h3 className="text-lg font-semibold text-muted-foreground">No tasks found</h3>
+              <p className="text-sm text-muted-foreground/60 max-w-sm mt-1">
+                {searchQuery
+                  ? `No matches for "${searchQuery}"`
+                  : filter === 'completed'
+                    ? "You haven't completed any tasks yet."
+                    : "You have no tasks in this view."}
+              </p>
             </motion.div>
-          ))}
+          )}
         </AnimatePresence>
       </div>
     </div>

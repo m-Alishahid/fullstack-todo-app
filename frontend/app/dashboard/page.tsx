@@ -3,29 +3,15 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { User, Task } from '@/lib/types';
 import { getTasks, createTask, updateTask, deleteTask } from '@/lib/api';
 import TaskList from '@/components/TaskList';
 import TaskForm from '@/components/TaskForm';
-import ThemeToggle from '@/components/ThemeToggle';
 import SearchBar from '@/components/SearchBar';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-/**
- * Protected Dashboard Page
- *
- * Displays user information, task management, and provides logout functionality.
- * Redirects to landing page if user is not authenticated.
- *
- * Features:
- * - Authentication check via localStorage
- * - Task list with filtering and sorting
- * - Create task modal
- * - Edit task modal
- * - Optimistic UI updates
- * - Error handling and loading states
- */
 export default function DashboardPage() {
   const router = useRouter();
 
@@ -45,37 +31,24 @@ export default function DashboardPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
-  /**
-   * Check authentication on mount
-   */
+  // Check auth
   useEffect(() => {
     const checkAuth = () => {
       try {
-        // Check for auth token
         const token = localStorage.getItem('auth_token');
-
         if (!token) {
-          // No token found, redirect to landing page
           router.push('/');
           return;
         }
-
-        // Get user data from localStorage
         const userDataString = localStorage.getItem('user');
-
         if (!userDataString) {
-          // Token exists but no user data, clear token and redirect
           localStorage.removeItem('auth_token');
           router.push('/');
           return;
         }
-
-        // Parse and set user data
-        const userData: User = JSON.parse(userDataString);
-        setUser(userData);
+        setUser(JSON.parse(userDataString));
       } catch (error) {
         console.error('Error checking authentication:', error);
-        // Clear potentially corrupted data and redirect
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user');
         router.push('/');
@@ -83,26 +56,19 @@ export default function DashboardPage() {
         setIsAuthLoading(false);
       }
     };
-
     checkAuth();
   }, [router]);
 
-  /**
-   * Fetch tasks after authentication is confirmed
-   */
+  // Fetch tasks
   useEffect(() => {
     if (user) {
       fetchTasks();
     }
   }, [user]);
 
-  /**
-   * Fetch all tasks from API
-   */
   const fetchTasks = async () => {
     setIsTasksLoading(true);
     setTasksError(null);
-
     try {
       const fetchedTasks = await getTasks();
       setTasks(fetchedTasks);
@@ -114,21 +80,6 @@ export default function DashboardPage() {
     }
   };
 
-  /**
-   * Handle logout
-   */
-  const handleLogout = () => {
-    // Clear authentication data
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user');
-
-    // Redirect to landing page
-    router.push('/');
-  };
-
-  /**
-   * Handle create task submission
-   */
   const handleCreateTask = async (
     title: string,
     description: string,
@@ -137,27 +88,16 @@ export default function DashboardPage() {
     dueDate?: Date | null
   ) => {
     try {
-      // Create task via API
       const newTask = await createTask(title, description, category, priority, dueDate);
-
-      // Optimistic update: add task to list immediately
       setTasks(prevTasks => [newTask, ...prevTasks]);
-
-      // Close modal
       setShowCreateModal(false);
-
-      // Show success notification
       toast.success('Task created successfully!');
     } catch (error) {
       console.error('Error creating task:', error);
-      // Re-throw error to be handled by TaskForm
       throw error;
     }
   };
 
-  /**
-   * Handle edit task submission
-   */
   const handleUpdateTask = async (
     title: string,
     description: string,
@@ -166,9 +106,7 @@ export default function DashboardPage() {
     dueDate?: Date | null
   ) => {
     if (!editingTask) return;
-
     try {
-      // Update task via API
       const updatedTask = await updateTask(editingTask.id, {
         title,
         description,
@@ -176,232 +114,148 @@ export default function DashboardPage() {
         priority,
         due_date: dueDate,
       });
-
-      // Optimistic update: update task in list
       setTasks(prevTasks =>
         prevTasks.map(task => (task.id === updatedTask.id ? updatedTask : task))
       );
-
-      // Close modal
       setEditingTask(null);
-
-      // Show success notification
       toast.success('Task updated successfully!');
     } catch (error) {
       console.error('Error updating task:', error);
-      // Re-throw error to be handled by TaskForm
       throw error;
     }
   };
 
-  /**
-   * Handle task update (from toggle completion)
-   */
   const handleTaskUpdate = (updatedTask: Task) => {
-    // Optimistic update: update task in list
     setTasks(prevTasks =>
       prevTasks.map(task => (task.id === updatedTask.id ? updatedTask : task))
     );
   };
 
-  /**
-   * Handle task deletion
-   */
   const handleTaskDelete = async (taskId: number) => {
     try {
-      // Delete task via API
       await deleteTask(taskId);
-
-      // Optimistic update: remove task from list
       setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
-
-      // Show success notification
       toast.success('Task deleted successfully!');
     } catch (error) {
       console.error('Error deleting task:', error);
-      // Show error notification
       toast.error(error instanceof Error ? error.message : 'Failed to delete task');
     }
   };
 
-  /**
-   * Handle edit button click
-   */
-  const handleTaskEdit = (task: Task) => {
-    setEditingTask(task);
-  };
-
-  /**
-   * Close create modal
-   */
-  const handleCloseCreateModal = () => {
-    setShowCreateModal(false);
-  };
-
-  /**
-   * Close edit modal
-   */
-  const handleCloseEditModal = () => {
-    setEditingTask(null);
-  };
-
-  // Show loading state while checking authentication
-  if (isAuthLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-indigo-900">
-        <div className="text-center">
-          <div className="relative inline-block">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-indigo-200 dark:border-indigo-800 border-t-indigo-600 dark:border-t-indigo-400"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-8 w-8 text-indigo-600 dark:text-indigo-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                />
-              </svg>
-            </div>
-          </div>
-          <p className="mt-6 text-gray-600 dark:text-gray-300 font-medium">Loading your workspace...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // If no user data, don't render anything (redirect is in progress)
-  if (!user) {
-    return null;
-  }
+  if (isAuthLoading) return null; // Let layout handle loading state if necessary or add simple spinner
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-indigo-900">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div className="flex items-center gap-4">
-              {/* Logo/Icon */}
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-7 w-7 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-                  />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-white">
-                  Todo Dashboard
-                </h1>
-                <p className="text-indigo-100 dark:text-indigo-200 text-sm mt-0.5">Welcome back, {user.name}!</p>
-              </div>
-            </div>
-            <div className="flex gap-3 w-full sm:w-auto">
-              <ThemeToggle />
-              <button
-                onClick={handleLogout}
-                className="flex-1 sm:flex-none px-5 py-2.5 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-purple-600 font-medium flex items-center justify-center gap-2"
-                aria-label="Logout"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
-                </svg>
-                Logout
-              </button>
-            </div>
-          </div>
+    <div className="space-y-8 animate-fadeIn">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
+            Overview of your task management progress.
+          </p>
         </div>
-      </header>
+        <Button onClick={() => setShowCreateModal(true)} size="lg" className="shadow-lg shadow-primary/20">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="w-4 h-4 mr-2"
+          >
+            <path d="M5 12h14" />
+            <path d="M12 5v14" />
+          </svg>
+          New Task
+        </Button>
+      </div>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          {/* Total Tasks */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-indigo-100 dark:border-gray-700 hover:shadow-xl transition-shadow duration-200 animate-slideUp">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Total Tasks</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{tasks.length}</p>
-              </div>
-              <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Active Tasks */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-blue-100 dark:border-gray-700 hover:shadow-xl transition-shadow duration-200 animate-slideUp" style={{ animationDelay: '0.1s' }}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Active</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{tasks.filter(t => !t.completed).length}</p>
-              </div>
-              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Completed Tasks */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-green-100 dark:border-gray-700 hover:shadow-xl transition-shadow duration-200 animate-slideUp" style={{ animationDelay: '0.2s' }}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Completed</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{tasks.filter(t => t.completed).length}</p>
-              </div>
-              <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Task List Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 p-6 sm:p-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Your Tasks
-            </h2>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
-              aria-label="Create new task"
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              className="h-4 w-4 text-muted-foreground"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-              </svg>
-              New Task
-            </button>
-          </div>
+              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{tasks.length}</div>
+            <p className="text-xs text-muted-foreground">
+              +0% from last month
+            </p>
+          </CardContent>
+        </Card>
 
-          {/* Search Bar */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active</CardTitle>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              className="h-4 w-4 text-muted-foreground"
+            >
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+            </svg>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{tasks.filter(t => !t.completed).length}</div>
+            <p className="text-xs text-muted-foreground">
+              Tasks remaining
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              className="h-4 w-4 text-muted-foreground"
+            >
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{tasks.filter(t => t.completed).length}</div>
+            <p className="text-xs text-muted-foreground">
+              Tasks finished
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Task List Area */}
+      <Card className="border-border/50">
+        <CardContent className="p-6">
           <div className="mb-6">
             <SearchBar
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="Search tasks by title or description..."
+              placeholder="Filter tasks..."
             />
           </div>
 
@@ -410,81 +264,41 @@ export default function DashboardPage() {
             searchQuery={searchQuery}
             onTaskUpdate={handleTaskUpdate}
             onTaskDelete={handleTaskDelete}
-            onTaskEdit={handleTaskEdit}
+            onTaskEdit={setEditingTask}
             isLoading={isTasksLoading}
             error={tasksError}
           />
-        </div>
-      </main>
+        </CardContent>
+      </Card>
 
-      {/* Create Task Modal */}
+      {/* Create Modal */}
       {showCreateModal && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn overflow-y-auto"
-          onClick={handleCloseCreateModal}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="create-task-title"
-        >
-          <div
-            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-8 animate-scaleIn my-8 max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h2
-                id="create-task-title"
-                className="text-2xl font-bold text-gray-900 dark:text-white"
-              >
-                Create New Task
-              </h2>
-              <button
-                onClick={handleCloseCreateModal}
-                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                aria-label="Close modal"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl p-6 animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Create New Task</h2>
+              <Button variant="ghost" size="icon" onClick={() => setShowCreateModal(false)}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+              </Button>
             </div>
             <TaskForm
               onSubmit={handleCreateTask}
               submitLabel="Create Task"
-              onCancel={handleCloseCreateModal}
+              onCancel={() => setShowCreateModal(false)}
             />
           </div>
         </div>
       )}
 
-      {/* Edit Task Modal */}
+      {/* Edit Modal */}
       {editingTask && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn overflow-y-auto"
-          onClick={handleCloseEditModal}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="edit-task-title"
-        >
-          <div
-            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-8 animate-scaleIn my-8 max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h2
-                id="edit-task-title"
-                className="text-2xl font-bold text-gray-900 dark:text-white"
-              >
-                Edit Task
-              </h2>
-              <button
-                onClick={handleCloseEditModal}
-                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                aria-label="Close modal"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl p-6 animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Edit Task</h2>
+              <Button variant="ghost" size="icon" onClick={() => setEditingTask(null)}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+              </Button>
             </div>
             <TaskForm
               onSubmit={handleUpdateTask}
@@ -494,7 +308,7 @@ export default function DashboardPage() {
               initialPriority={editingTask.priority}
               initialDueDate={editingTask.due_date}
               submitLabel="Update Task"
-              onCancel={handleCloseEditModal}
+              onCancel={() => setEditingTask(null)}
             />
           </div>
         </div>

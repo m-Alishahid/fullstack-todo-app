@@ -11,7 +11,7 @@ Endpoints:
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select
 from datetime import datetime
 
@@ -28,10 +28,10 @@ router = APIRouter()
 
 
 @router.get("", response_model=TaskListResponse)
-async def list_tasks(
+def list_tasks(
     completed: bool | None = None,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_db),
+    session: Session = Depends(get_db),
 ):
     """
     List all tasks for the current user.
@@ -55,7 +55,7 @@ async def list_tasks(
     query = query.order_by(Task.created_at.desc())
 
     # Execute query
-    result = await session.execute(query)
+    result = session.execute(query)
     tasks = result.scalars().all()
 
     return TaskListResponse(
@@ -65,10 +65,10 @@ async def list_tasks(
 
 
 @router.post("", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
-async def create_task(
+def create_task(
     task_data: TaskCreateRequest,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_db),
+    session: Session = Depends(get_db),
 ):
     """
     Create a new task for the current user.
@@ -90,17 +90,17 @@ async def create_task(
     )
 
     session.add(new_task)
-    await session.commit()
-    await session.refresh(new_task)
+    session.commit()
+    session.refresh(new_task)
 
     return TaskResponse.model_validate(new_task)
 
 
 @router.get("/{task_id}", response_model=TaskResponse)
-async def get_task(
+def get_task(
     task_id: int,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_db),
+    session: Session = Depends(get_db),
 ):
     """
     Get a specific task by ID.
@@ -117,7 +117,7 @@ async def get_task(
         HTTPException 404: If task not found or doesn't belong to user
     """
     # Fetch task
-    result = await session.execute(
+    result = session.execute(
         select(Task).where(Task.id == task_id, Task.user_id == current_user.id)
     )
     task = result.scalar_one_or_none()
@@ -132,11 +132,11 @@ async def get_task(
 
 
 @router.put("/{task_id}", response_model=TaskResponse)
-async def update_task(
+def update_task(
     task_id: int,
     task_data: TaskUpdateRequest,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_db),
+    session: Session = Depends(get_db),
 ):
     """
     Update an existing task.
@@ -154,7 +154,7 @@ async def update_task(
         HTTPException 404: If task not found or doesn't belong to user
     """
     # Fetch task
-    result = await session.execute(
+    result = session.execute(
         select(Task).where(Task.id == task_id, Task.user_id == current_user.id)
     )
     task = result.scalar_one_or_none()
@@ -178,17 +178,17 @@ async def update_task(
     # Update timestamp
     task.updated_at = datetime.utcnow()
 
-    await session.commit()
-    await session.refresh(task)
+    session.commit()
+    session.refresh(task)
 
     return TaskResponse.model_validate(task)
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_task(
+def delete_task(
     task_id: int,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_db),
+    session: Session = Depends(get_db),
 ):
     """
     Delete a task.
@@ -205,7 +205,7 @@ async def delete_task(
         HTTPException 404: If task not found or doesn't belong to user
     """
     # Fetch task
-    result = await session.execute(
+    result = session.execute(
         select(Task).where(Task.id == task_id, Task.user_id == current_user.id)
     )
     task = result.scalar_one_or_none()
@@ -217,17 +217,17 @@ async def delete_task(
         )
 
     # Delete task
-    await session.delete(task)
-    await session.commit()
+    session.delete(task)
+    session.commit()
 
     return None
 
 
 @router.patch("/{task_id}/complete", response_model=TaskResponse)
-async def toggle_task_completion(
+def toggle_task_completion(
     task_id: int,
     current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_db),
+    session: Session = Depends(get_db),
 ):
     """
     Toggle the completion status of a task.
@@ -244,7 +244,7 @@ async def toggle_task_completion(
         HTTPException 404: If task not found or doesn't belong to user
     """
     # Fetch task
-    result = await session.execute(
+    result = session.execute(
         select(Task).where(Task.id == task_id, Task.user_id == current_user.id)
     )
     task = result.scalar_one_or_none()
@@ -261,7 +261,7 @@ async def toggle_task_completion(
     # Update timestamp
     task.updated_at = datetime.utcnow()
 
-    await session.commit()
-    await session.refresh(task)
+    session.commit()
+    session.refresh(task)
 
     return TaskResponse.model_validate(task)
