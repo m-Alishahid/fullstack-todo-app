@@ -89,7 +89,7 @@ export default function AuthForm() {
     setLoading(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
       const endpoint = mode === 'signup' ? '/api/auth/register' : '/api/auth/login';
 
       // Prepare request body

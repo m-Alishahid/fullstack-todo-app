@@ -12,7 +12,7 @@ import { Task } from '@/lib/types';
  * API base URL from environment variables.
  * Falls back to localhost if not set.
  */
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 
 /**
  * Custom error class for API errors.
